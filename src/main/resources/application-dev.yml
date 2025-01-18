@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pms_db
+    username: dev_user
+    password: dev_password
+
+logging:
+  level:
+    com.elva.pms: DEBUG
+    org.springframework.jdbc.core: DEBUG
+
+file:
+  upload:
+    directory: /tmp/uploads/dev 

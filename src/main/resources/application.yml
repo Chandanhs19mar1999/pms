@@ -1,0 +1,35 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: plot-management-service
+    
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pms_db
+    username: your_username
+    password: your_password
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      pool-name: PmsHikariPool
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+file:
+  upload:
+    directory: /tmp/uploads
+
+logging:
+  level:
+    root: INFO
+    com.elva.pms: DEBUG
+    org.springframework.jdbc.core: DEBUG
