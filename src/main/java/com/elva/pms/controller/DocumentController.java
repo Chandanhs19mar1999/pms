@@ -3,8 +3,7 @@ package com.elva.pms.controller;
 import com.elva.pms.enums.EntityType;
 import com.elva.pms.enums.FileCategory;
 import com.elva.pms.pojo.response.ApiResponse;
-import com.elva.pms.service.DocumentService;
-import lombok.RequiredArgsConstructor;
+import com.elva.pms.service.impl.DocumentServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class DocumentController {
 
     @Autowired
-    private  DocumentService documentService;
+    private DocumentServiceImpl documentServiceImpl;
 
 
     @PostMapping(value = "/file-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -26,7 +25,7 @@ public class DocumentController {
             @RequestParam("entityType") EntityType entityType,
             @RequestParam("fileCategory") FileCategory fileCategory) {
         return ResponseEntity.ok(ApiResponse.success(
-            documentService.uploadFile(file, entityId, entityType, fileCategory)));
+            documentServiceImpl.uploadFile(file, entityId, entityType, fileCategory)));
     }
     
     @GetMapping("/documents")
@@ -34,7 +33,7 @@ public class DocumentController {
             @RequestParam("entityId") Long entityId,
             @RequestParam("entityType") EntityType entityType) {
         return ResponseEntity.ok(ApiResponse.success(
-            documentService.getDocuments(entityId, entityType)));
+            documentServiceImpl.getDocuments(entityId, entityType)));
     }
     
     @GetMapping("/file-categories")
@@ -44,7 +43,7 @@ public class DocumentController {
     
     @DeleteMapping("/documents/{id}")
     public ResponseEntity<?> deleteDocument(@PathVariable Long id) {
-        documentService.deleteDocument(id);
+        documentServiceImpl.deleteDocument(id);
         return ResponseEntity.ok(ApiResponse.success("Document deleted successfully"));
     }
 } 

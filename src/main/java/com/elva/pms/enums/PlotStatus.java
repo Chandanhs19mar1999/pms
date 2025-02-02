@@ -1,6 +1,6 @@
 package com.elva.pms.enums;
 
-public enum Status {
+public enum PlotStatus {
     ACTIVE,
     INACTIVE,
     SOLD,

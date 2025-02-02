@@ -1,5 +1,6 @@
 package com.elva.pms.pojo.response;
 
+import lombok.Builder;
 import lombok.Data;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -7,6 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class ApiResponse<T> {
     private boolean success;
     private String message;

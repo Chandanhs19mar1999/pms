@@ -1,19 +1,26 @@
 package com.elva.pms.pojo.response;
 
-import com.elva.pms.enums.Status;
+import com.elva.pms.enums.LandProjectStatus;
+import com.elva.pms.enums.PlotStatus;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class LandProjectResponse {
     private Long id;
-    private Long developId;
+    private Long developerId;
     private String name;
     private String description;
     private Long locationId;
-    private Status status;
+    private LandProjectStatus status;
     private String metadata;
     private boolean isActive;
     
@@ -23,11 +30,9 @@ public class LandProjectResponse {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;
     
-    private String createdBy;
-    private String updatedBy;
-    
-    // Additional fields that might be needed in response
-    private Integer totalPlots;
-    private Integer availablePlots;
-    private String locationName; // If you want to include location details
+    private Long createdBy;
+    private Long updatedBy;
+
+    private Long totalPlots;
+    private String locationName;
 } 

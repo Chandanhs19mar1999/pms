@@ -1,7 +1,10 @@
 package com.elva.pms.jdbc;
 
-import com.elva.pms.pojo.dao.LandProject;
-import com.elva.pms.enums.Status;
+import com.elva.pms.enums.LandProjectStatus;
+import com.elva.pms.pojo.dao.LandProjectDao;
+import com.elva.pms.enums.PlotStatus;
+import com.elva.pms.pojo.request.LandProjectFilterRequest;
+import com.elva.pms.utils.CommonUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -10,7 +13,6 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -25,11 +27,11 @@ public class LandProjectJdbcRepository {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper mapper;
 
-    public long insert(LandProject landProject) {
+    public long insert(LandProjectDao landProjectDao) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         String sql = "INSERT INTO land_project (" +
-                "develop_id, " +
+                "developer_id, " +
                 "name, " +
                 "description, " +
                 "location_id, " +
@@ -45,29 +47,29 @@ public class LandProjectJdbcRepository {
         jdbcTemplate.update(con -> {
             PreparedStatement ps = con.prepareStatement(sql, new String[]{"id"});
             int index = 0;
-            ps.setLong(++index, landProject.getDevelopId());
-            ps.setString(++index, landProject.getName());
-            ps.setString(++index, landProject.getDescription());
-            ps.setLong(++index, landProject.getLocationId());
-            ps.setString(++index, landProject.getStatus().toString());
+            ps.setLong(++index, landProjectDao.getDeveloperId());
+            ps.setString(++index, landProjectDao.getName());
+            ps.setString(++index, landProjectDao.getDescription());
+            ps.setLong(++index, landProjectDao.getLocationId());
+            ps.setString(++index, landProjectDao.getStatus().toString());
             try {
-                ps.setString(++index, landProject.getMetadata() != null ? 
-                    mapper.writeValueAsString(landProject.getMetadata()) : null);
+                ps.setString(++index, landProjectDao.getMetadata() != null ? 
+                    mapper.writeValueAsString(landProjectDao.getMetadata()) : null);
             } catch (Exception e) {
                 ps.setString(++index, null);
             }
             ps.setBoolean(++index, true);
-            ps.setString(++index, landProject.getCreatedBy());
-            ps.setString(++index, landProject.getCreatedBy());
+            ps.setLong(++index, landProjectDao.getCreatedBy());
+            ps.setLong(++index, landProjectDao.getCreatedBy());
             return ps;
         }, keyHolder);
 
         return keyHolder.getKey().longValue();
     }
 
-    public void update(LandProject landProject) {
+    public void update(LandProjectDao landProjectDao) {
         String sql = "UPDATE land_project SET " +
-                "develop_id = ?, " +
+                "developer_id = ?, " +
                 "name = ?, " +
                 "description = ?, " +
                 "location_id = ?, " +
@@ -78,88 +80,86 @@ public class LandProjectJdbcRepository {
                 "WHERE id = ?";
 
         jdbcTemplate.update(sql,
-                landProject.getDevelopId(),
-                landProject.getName(),
-                landProject.getDescription(),
-                landProject.getLocationId(),
-                landProject.getStatus().toString(),
-                landProject.getMetadata(),
-                landProject.getUpdatedBy(),
-                landProject.getId()
+                landProjectDao.getDeveloperId(),
+                landProjectDao.getName(),
+                landProjectDao.getDescription(),
+                landProjectDao.getLocationId(),
+                landProjectDao.getStatus().toString(),
+                landProjectDao.getMetadata(),
+                landProjectDao.getUpdatedBy(),
+                landProjectDao.getId()
         );
     }
 
-    public LandProject findById(Long id) {
+    public List<LandProjectDao> getProjectsByFilter(LandProjectFilterRequest filterRequest) {
+        String sql = "SELECT lp.*, COUNT(p.id) AS total_plots " +
+                "FROM land_project lp LEFT JOIN plot p ON p.land_project_id = lp.id";
+
+        List<String> keys = new ArrayList<>();
+        List<Object> values = new ArrayList<>();
+        String whereQuery = generateWhereQuery(filterRequest, keys, values);
+
+        String groupQuery = "GROUP BY lp.id";
+
+        String limitQuery = CommonUtils.generateLimitQuery(filterRequest.getLimit(), filterRequest.getOffset(), values);
+
+        String finalQuery = String.join(" ", sql, whereQuery, groupQuery, limitQuery);
+
         try {
-            String sql = "SELECT * FROM land_project WHERE id = ? AND is_active = true";
-            return jdbcTemplate.queryForObject(sql, new Object[]{id}, new LandProjectMapper());
+            return jdbcTemplate.query(finalQuery, values.toArray(), new LandProjectJdbcRepository.LandProjectMapper());
         } catch (EmptyResultDataAccessException e) {
             return null;
         }
     }
 
-    public List<LandProject> findAll() {
-        String sql = "SELECT * FROM land_project WHERE is_active = true";
-        return jdbcTemplate.query(sql, new LandProjectMapper());
+
+    private String generateWhereQuery(LandProjectFilterRequest filterRequest, List<String> keys, List<Object> values) {
+        keys.add(" lp.is_active = true ");
+
+        if (filterRequest.getProjectId() != null) {
+            keys.add(" lp.id = ?");
+            values.add(filterRequest.getProjectId());
+        }
+
+        if (filterRequest.getDeveloperId() != null) {
+            keys.add(" lp.developer_id = ?");
+            values.add(filterRequest.getDeveloperId());
+        }
+        if (filterRequest.getName() != null) {
+            keys.add("lp.name LIKE ?");
+            values.add('%' + filterRequest.getName() + '%');
+        }
+        return !keys.isEmpty() ? "WHERE " + String.join(" AND ", keys) : "";
     }
 
-    public List<LandProject> findByFilter(String name, Long locationId, Long developId) {
-        List<String> conditions = new ArrayList<>();
-        List<Object> params = new ArrayList<>();
-        
-        StringBuilder sql = new StringBuilder("SELECT * FROM land_project WHERE is_active = true");
-        
-        if (name != null && !name.trim().isEmpty()) {
-            conditions.add("name LIKE ?");
-            params.add("%" + name + "%");
-        }
-        
-        if (locationId != null) {
-            conditions.add("location_id = ?");
-            params.add(locationId);
-        }
-        
-        if (developId != null) {
-            conditions.add("develop_id = ?");
-            params.add(developId);
-        }
-        
-        if (!conditions.isEmpty()) {
-            sql.append(" AND ").append(String.join(" AND ", conditions));
-        }
-        
-        sql.append(" ORDER BY created_at DESC");
-        
-        return jdbcTemplate.query(sql.toString(), params.toArray(), new LandProjectMapper());
-    }
 
-    private static class LandProjectMapper implements RowMapper<LandProject> {
+    private static class LandProjectMapper implements RowMapper<LandProjectDao> {
         @Override
-        public LandProject mapRow(ResultSet rs, int rowNum) throws SQLException {
-            LandProject landProject = new LandProject();
-            landProject.setId(rs.getLong("id"));
-            landProject.setDevelopId(rs.getLong("develop_id"));
-            landProject.setName(rs.getString("name"));
-            landProject.setDescription(rs.getString("description"));
-            landProject.setLocationId(rs.getLong("location_id"));
-            landProject.setStatus(Status.valueOf(rs.getString("status")));
-            landProject.setMetadata(rs.getString("metadata"));
-            landProject.setActive(rs.getBoolean("is_active"));
+        public LandProjectDao mapRow(ResultSet rs, int rowNum) throws SQLException {
+            LandProjectDao landProjectDao = new LandProjectDao();
+            landProjectDao.setId(rs.getLong("id"));
+            landProjectDao.setDeveloperId(rs.getLong("developer_id"));
+            landProjectDao.setName(rs.getString("name"));
+            landProjectDao.setDescription(rs.getString("description"));
+            landProjectDao.setLocationId(rs.getLong("location_id"));
+            landProjectDao.setStatus(LandProjectStatus.valueOf(rs.getString("status")));
+            landProjectDao.setMetadata(rs.getString("metadata"));
+            landProjectDao.setIsActive(rs.getBoolean("is_active"));
             
             Timestamp createdAt = rs.getTimestamp("created_at");
             if (createdAt != null) {
-                landProject.setCreatedAt(createdAt.toLocalDateTime());
+                landProjectDao.setCreatedAt(createdAt.toLocalDateTime());
             }
             
             Timestamp updatedAt = rs.getTimestamp("updated_at");
             if (updatedAt != null) {
-                landProject.setUpdatedAt(updatedAt.toLocalDateTime());
+                landProjectDao.setUpdatedAt(updatedAt.toLocalDateTime());
             }
+            landProjectDao.setCreatedBy(rs.getLong("created_by"));
+            landProjectDao.setUpdatedBy(rs.getLong("updated_by"));
+            landProjectDao.setTotalPlots(rs.getLong("total_plots"));
             
-            landProject.setCreatedBy(rs.getString("created_by"));
-            landProject.setUpdatedBy(rs.getString("updated_by"));
-            
-            return landProject;
+            return landProjectDao;
         }
     }
 } 

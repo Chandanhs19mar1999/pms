@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class Document {
+public class DocumentDao {
     private Long id;
     private Long entityId;
     private EntityType entityType;

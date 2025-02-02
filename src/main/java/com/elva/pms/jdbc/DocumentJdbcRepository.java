@@ -1,6 +1,6 @@
 package com.elva.pms.jdbc;
 
-import com.elva.pms.pojo.dao.Document;
+import com.elva.pms.pojo.dao.DocumentDao;
 import com.elva.pms.enums.EntityType;
 import com.elva.pms.enums.FileCategory;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +9,6 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -22,7 +21,7 @@ import java.util.List;
 public class DocumentJdbcRepository {
     private final JdbcTemplate jdbcTemplate;
 
-    public long insert(Document document) {
+    public long insert(DocumentDao documentDao) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         String sql = "INSERT INTO document_management (" +
@@ -41,21 +40,21 @@ public class DocumentJdbcRepository {
         jdbcTemplate.update(con -> {
             PreparedStatement ps = con.prepareStatement(sql, new String[]{"id"});
             int index = 0;
-            ps.setLong(++index, document.getEntityId());
-            ps.setString(++index, document.getEntityType().toString());
-            ps.setString(++index, document.getFileCategory().toString());
-            ps.setString(++index, document.getFileName());
-            ps.setString(++index, document.getFilePath());
+            ps.setLong(++index, documentDao.getEntityId());
+            ps.setString(++index, documentDao.getEntityType().toString());
+            ps.setString(++index, documentDao.getFileCategory().toString());
+            ps.setString(++index, documentDao.getFileName());
+            ps.setString(++index, documentDao.getFilePath());
             ps.setBoolean(++index, true);
-            ps.setString(++index, document.getCreatedBy());
-            ps.setString(++index, document.getCreatedBy());
+            ps.setString(++index, documentDao.getCreatedBy());
+            ps.setString(++index, documentDao.getCreatedBy());
             return ps;
         }, keyHolder);
 
         return keyHolder.getKey().longValue();
     }
 
-    public List<Document> findByEntityIdAndType(Long entityId, EntityType entityType) {
+    public List<DocumentDao> findByEntityIdAndType(Long entityId, EntityType entityType) {
         String sql = "SELECT * FROM document_management " +
                 "WHERE entity_id = ? AND entity_type = ? AND is_active = true";
         
@@ -63,32 +62,32 @@ public class DocumentJdbcRepository {
             new DocumentMapper());
     }
 
-    private static class DocumentMapper implements RowMapper<Document> {
+    private static class DocumentMapper implements RowMapper<DocumentDao> {
         @Override
-        public Document mapRow(ResultSet rs, int rowNum) throws SQLException {
-            Document document = new Document();
-            document.setId(rs.getLong("id"));
-            document.setEntityId(rs.getLong("entity_id"));
-            document.setEntityType(EntityType.valueOf(rs.getString("entity_type")));
-            document.setFileCategory(FileCategory.valueOf(rs.getString("file_category")));
-            document.setFileName(rs.getString("file_name"));
-            document.setFilePath(rs.getString("file_path"));
-            document.setActive(rs.getBoolean("is_active"));
+        public DocumentDao mapRow(ResultSet rs, int rowNum) throws SQLException {
+            DocumentDao documentDao = new DocumentDao();
+            documentDao.setId(rs.getLong("id"));
+            documentDao.setEntityId(rs.getLong("entity_id"));
+            documentDao.setEntityType(EntityType.valueOf(rs.getString("entity_type")));
+            documentDao.setFileCategory(FileCategory.valueOf(rs.getString("file_category")));
+            documentDao.setFileName(rs.getString("file_name"));
+            documentDao.setFilePath(rs.getString("file_path"));
+            documentDao.setActive(rs.getBoolean("is_active"));
             
             Timestamp createdAt = rs.getTimestamp("created_at");
             if (createdAt != null) {
-                document.setCreatedAt(createdAt.toLocalDateTime());
+                documentDao.setCreatedAt(createdAt.toLocalDateTime());
             }
             
             Timestamp updatedAt = rs.getTimestamp("updated_at");
             if (updatedAt != null) {
-                document.setUpdatedAt(updatedAt.toLocalDateTime());
+                documentDao.setUpdatedAt(updatedAt.toLocalDateTime());
             }
             
-            document.setCreatedBy(rs.getString("created_by"));
-            document.setUpdatedBy(rs.getString("updated_by"));
+            documentDao.setCreatedBy(rs.getString("created_by"));
+            documentDao.setUpdatedBy(rs.getString("updated_by"));
             
-            return document;
+            return documentDao;
         }
     }
 } 

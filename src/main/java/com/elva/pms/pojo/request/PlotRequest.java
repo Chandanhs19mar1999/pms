@@ -1,23 +1,33 @@
 package com.elva.pms.pojo.request;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Positive;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 public class PlotRequest {
-    @NotNull(message = "Land Project ID is required")
+    @NotNull(message = "Land Project ID cannot be empty")
     private Long landProjectId;
     
-    @NotNull(message = "Plot number is required")
+    @NotBlank(message = "Plot Number cannot be empty")
     private String plotNumber;
     
-    @Positive(message = "Size must be positive")
+    @NotNull(message = "Size cannot be empty")
     private Double size;
     
-    @Positive(message = "Price must be positive")
+    @NotNull(message = "Price cannot be empty")
     private BigDecimal price;
     
     private String metadata;
-} 
+    
+    @NotBlank(message = "Status cannot be empty")
+    private String status;
+}

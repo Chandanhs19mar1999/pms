@@ -1,29 +1,36 @@
 package com.elva.pms.jdbc;
 
-import com.elva.pms.pojo.dao.Plot;
-import com.elva.pms.enums.Status;
+import com.elva.pms.pojo.dao.PlotDao;
+import com.elva.pms.enums.PlotStatus;
+import com.elva.pms.pojo.request.PlotFilterRequest;
+import com.elva.pms.utils.CommonUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 public class PlotJdbcRepository {
-    private final JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private final ObjectMapper mapper;
 
-    public long insert(Plot plot) {
+    public List<Long> bulkInsert(List<PlotDao> plotDaos) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         String sql = "INSERT INTO plot (" +
@@ -40,30 +47,36 @@ public class PlotJdbcRepository {
                 "updated_by) " +
                 "VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,?)";
 
-        jdbcTemplate.update(con -> {
-            PreparedStatement ps = con.prepareStatement(sql, new String[]{"id"});
-            int index = 0;
-            ps.setLong(++index, plot.getLandProjectId());
-            ps.setString(++index, plot.getPlotNumber());
-            ps.setDouble(++index, plot.getSize());
-            ps.setBigDecimal(++index, plot.getPrice());
-            ps.setString(++index, plot.getStatus().toString());
-            try {
-                ps.setString(++index, plot.getMetadata() != null ? 
-                    mapper.writeValueAsString(plot.getMetadata()) : null);
-            } catch (Exception e) {
-                ps.setString(++index, null);
-            }
-            ps.setBoolean(++index, true);
-            ps.setString(++index, plot.getCreatedBy());
-            ps.setString(++index, plot.getCreatedBy());
-            return ps;
-        }, keyHolder);
+        List<Long> generatedIds = new ArrayList<>();
 
-        return keyHolder.getKey().longValue();
+        for (PlotDao plotDao : plotDaos) {
+            jdbcTemplate.update(con -> {
+                PreparedStatement ps = con.prepareStatement(sql, new String[]{"id"});
+                int index = 0;
+                ps.setLong(++index, plotDao.getLandProjectId());
+                ps.setString(++index, plotDao.getPlotNumber());
+                ps.setDouble(++index, plotDao.getSize());
+                ps.setBigDecimal(++index, plotDao.getPrice());
+                ps.setString(++index, plotDao.getPlotStatus().toString());
+                try {
+                    ps.setString(++index, plotDao.getMetadata() != null ?
+                        mapper.writeValueAsString(plotDao.getMetadata()) : null);
+                } catch (Exception e) {
+                    ps.setString(++index, null);
+                }
+                ps.setBoolean(++index, true);
+                ps.setLong(++index, plotDao.getCreatedBy());
+                ps.setLong(++index, plotDao.getCreatedBy());
+                return ps;
+            }, keyHolder);
+
+            generatedIds.add(keyHolder.getKey().longValue());
+        }
+
+        return generatedIds;
     }
 
-    public void update(Plot plot) {
+    public void update(PlotDao plotDao) {
         String sql = "UPDATE plot SET " +
                 "land_project_id = ?, " +
                 "plot_number = ?, " +
@@ -76,54 +89,86 @@ public class PlotJdbcRepository {
                 "WHERE id = ?";
 
         jdbcTemplate.update(sql,
-                plot.getLandProjectId(),
-                plot.getPlotNumber(),
-                plot.getSize(),
-                plot.getPrice(),
-                plot.getStatus().toString(),
-                plot.getMetadata(),
-                plot.getUpdatedBy(),
-                plot.getId()
+                plotDao.getLandProjectId(),
+                plotDao.getPlotNumber(),
+                plotDao.getSize(),
+                plotDao.getPrice(),
+                plotDao.getPlotStatus().toString(),
+                plotDao.getMetadata(),
+                plotDao.getUpdatedBy(),
+                plotDao.getId()
         );
     }
 
-    public List<Plot> findAll() {
-        String sql = "SELECT * FROM plot WHERE is_active = true";
-        return jdbcTemplate.query(sql, new PlotMapper());
+    public List<PlotDao> getPlotsByFilter(PlotFilterRequest filterRequest) {
+        String sql = "SELECT * FROM plot";
+
+        List<String> keys = new ArrayList<>();
+        List<Object> values = new ArrayList<>();
+        String whereQuery = generateWhereQuery(filterRequest, keys, values);
+
+        String limitQuery = CommonUtils.generateLimitQuery(filterRequest.getLimit(), filterRequest.getOffset(), values);
+
+        String finalQuery = String.join(" ", sql, whereQuery, limitQuery);
+        try {
+            return jdbcTemplate.query(finalQuery, values.toArray(), new PlotJdbcRepository.PlotMapper());
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
     }
 
-    public List<Plot> findByLandProjectId(Long landProjectId) {
-        String sql = "SELECT * FROM plot WHERE land_project_id = ? AND is_active = true";
-        return jdbcTemplate.query(sql, new Object[]{landProjectId}, new PlotMapper());
+
+    private String generateWhereQuery(PlotFilterRequest filterRequest, List<String> keys, List<Object> values) {
+        keys.add("is_active = true");
+        if (filterRequest.getPlotId() != null) {
+            keys.add("id = ?");
+            values.add(filterRequest.getPlotId());
+        }
+        if (filterRequest.getPlotNumber() != null) {
+            keys.add("plot_number = ?");
+            values.add(filterRequest.getPlotNumber());
+        }
+        if (filterRequest.getLandProjectId() != null) {
+            keys.add("land_project_id = ?");
+            values.add(filterRequest.getLandProjectId());
+        }
+
+        if (filterRequest.getStatus() != null) {
+            keys.add("status = ?");
+            values.add(filterRequest.getStatus());
+        }
+        return !keys.isEmpty() ? "WHERE " + String.join(" AND ", keys) : "";
     }
 
-    private static class PlotMapper implements RowMapper<Plot> {
+
+
+    private static class PlotMapper implements RowMapper<PlotDao> {
         @Override
-        public Plot mapRow(ResultSet rs, int rowNum) throws SQLException {
-            Plot plot = new Plot();
-            plot.setId(rs.getLong("id"));
-            plot.setLandProjectId(rs.getLong("land_project_id"));
-            plot.setPlotNumber(rs.getString("plot_number"));
-            plot.setSize(rs.getDouble("size"));
-            plot.setPrice(rs.getBigDecimal("price"));
-            plot.setStatus(Status.valueOf(rs.getString("status")));
-            plot.setMetadata(rs.getString("metadata"));
-            plot.setActive(rs.getBoolean("is_active"));
+        public PlotDao mapRow(ResultSet rs, int rowNum) throws SQLException {
+            PlotDao plotDao = new PlotDao();
+            plotDao.setId(rs.getLong("id"));
+            plotDao.setLandProjectId(rs.getLong("land_project_id"));
+            plotDao.setPlotNumber(rs.getString("plot_number"));
+            plotDao.setSize(rs.getDouble("size"));
+            plotDao.setPrice(rs.getBigDecimal("price"));
+            plotDao.setPlotStatus(PlotStatus.valueOf(rs.getString("status")));
+            plotDao.setMetadata(rs.getString("metadata"));
+            plotDao.setIsActive(rs.getBoolean("is_active"));
             
             Timestamp createdAt = rs.getTimestamp("created_at");
             if (createdAt != null) {
-                plot.setCreatedAt(createdAt.toLocalDateTime());
+                plotDao.setCreatedAt(createdAt.toLocalDateTime());
             }
             
             Timestamp updatedAt = rs.getTimestamp("updated_at");
             if (updatedAt != null) {
-                plot.setUpdatedAt(updatedAt.toLocalDateTime());
+                plotDao.setUpdatedAt(updatedAt.toLocalDateTime());
             }
             
-            plot.setCreatedBy(rs.getString("created_by"));
-            plot.setUpdatedBy(rs.getString("updated_by"));
+            plotDao.setCreatedBy(rs.getLong("created_by"));
+            plotDao.setUpdatedBy(rs.getLong("updated_by"));
             
-            return plot;
+            return plotDao;
         }
     }
 } 
